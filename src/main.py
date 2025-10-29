@@ -56,10 +56,30 @@ class HydraRemoteGUI:
         # Device list
         self.device_list = tk.Listbox(self.main_frame, height=10)
         self.device_list.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
+        self.device_list.bind('<<ListboxSelect>>', self._on_device_select)
+        self.selected_device_index = None
         
         # Status label
         self.status_label = ttk.Label(self.main_frame, text="Ready")
         self.status_label.grid(row=2, column=0, pady=5)
+
+        # Connect button
+        self.connect_button = ttk.Button(
+            self.main_frame,
+            text="Connect",
+            command=self._connect_selected_device,
+            state="disabled"
+        )
+        self.connect_button.grid(row=3, column=0, pady=5)
+
+        # Disconnect button
+        self.disconnect_button = ttk.Button(
+            self.main_frame,
+            text="Disconnect",
+            command=self._disconnect_device,
+            state="disabled"
+        )
+        self.disconnect_button.grid(row=4, column=0, pady=5)
     
     def _create_async_thread(self):
         """Create and start the async event loop thread."""
@@ -99,6 +119,9 @@ class HydraRemoteGUI:
                         name = device["name"] or "Unknown Device"
                         addr = device["address"]
                         self.device_list.insert(tk.END, f"{name} ({addr})")
+                    self.devices = result
+                    self.selected_device_index = None
+                    self.connect_button.config(state="disabled")
                     self.status_label.config(text=f"Found {len(result)} devices")
                 elif status == "error":
                     self.status_label.config(text=f"Error: {result}")
@@ -122,10 +145,65 @@ class HydraRemoteGUI:
         self.scan_button.config(state="disabled")
         self.status_label.config(text="Scanning...")
         self.device_list.delete(0, tk.END)
+        self.connect_button.config(state="disabled")
+        self.disconnect_button.config(state="disabled")
         
         # Queue the scan operation
         timeout = self.config.get("ble", {}).get("scan_timeout", 5.0)
         self._queue_async_task(self.ble.scan(timeout=timeout))
+
+    def _on_device_select(self, event):
+        selection = self.device_list.curselection()
+        if selection:
+            self.selected_device_index = selection[0]
+            self.connect_button.config(state="normal")
+        else:
+            self.selected_device_index = None
+            self.connect_button.config(state="disabled")
+
+    def _connect_selected_device(self):
+        if self.selected_device_index is None or not self.devices:
+            return
+        device = self.devices[self.selected_device_index]
+        address = device["address"]
+        self.status_label.config(text=f"Connecting to {address}...")
+        self.connect_button.config(state="disabled")
+        self.scan_button.config(state="disabled")
+        self._queue_async_task(self._async_connect(address))
+
+    async def _async_connect(self, address):
+        try:
+            connected = await self.ble.connect(address)
+            if connected:
+                self.status_label.config(text=f"Connected to {address}")
+                self.disconnect_button.config(state="normal")
+                self.connect_button.config(state="disabled")
+                self.scan_button.config(state="disabled")
+            else:
+                self.status_label.config(text=f"Failed to connect to {address}")
+                self.disconnect_button.config(state="disabled")
+                self.connect_button.config(state="normal")
+                self.scan_button.config(state="normal")
+        except Exception as e:
+            self.status_label.config(text=f"Connect error: {str(e)}")
+            self.disconnect_button.config(state="disabled")
+            self.connect_button.config(state="normal")
+            self.scan_button.config(state="normal")
+
+    def _disconnect_device(self):
+        self.status_label.config(text="Disconnecting...")
+        self.disconnect_button.config(state="disabled")
+        self._queue_async_task(self._async_disconnect())
+
+    async def _async_disconnect(self):
+        try:
+            await self.ble.disconnect()
+            self.status_label.config(text="Disconnected")
+            self.connect_button.config(state="disabled")
+            self.scan_button.config(state="normal")
+        except Exception as e:
+            self.status_label.config(text=f"Disconnect error: {str(e)}")
+            self.scan_button.config(state="normal")
     
     def run(self):
         """Start the GUI event loop."""

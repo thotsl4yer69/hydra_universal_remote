@@ -6,9 +6,12 @@ from tkinter import ttk
 from ttkthemes import ThemedTk
 from pathlib import Path
 from typing import Dict, Any, Optional
+import threading
+import queue
+import functools
 
 from .utils.config import load_config
-from .utils.ble import scan_for_devices, connect_device, list_services
+from .device.ble_adapter import BLEAdapter
 
 class HydraRemoteGUI:
     def __init__(self):
@@ -21,12 +24,20 @@ class HydraRemoteGUI:
         self.window.title(window_config.get("title", "Hydra Universal Remote"))
         self.window.geometry(f"{window_config.get('width', 800)}x{window_config.get('height', 600)}")
         
+        # Initialize BLE
+        self.ble = BLEAdapter()
+        
         # Create UI components
         self._create_widgets()
         
         # BLE state
         self.scanning = False
         self.devices = []
+        
+        # Setup async event loop
+        self.loop = asyncio.new_event_loop()
+        self.queue = queue.Queue()
+        self.thread = None
     
     def _create_widgets(self):
         """Create and layout all GUI widgets."""
@@ -50,6 +61,58 @@ class HydraRemoteGUI:
         self.status_label = ttk.Label(self.main_frame, text="Ready")
         self.status_label.grid(row=2, column=0, pady=5)
     
+    def _create_async_thread(self):
+        """Create and start the async event loop thread."""
+        if self.thread is not None:
+            return
+            
+        def run_async_loop():
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_forever()
+            
+        self.thread = threading.Thread(target=run_async_loop, daemon=True)
+        self.thread.start()
+        
+    def _queue_async_task(self, coro):
+        """Queue an async task and handle its result in the main thread."""
+        if self.thread is None:
+            self._create_async_thread()
+            
+        async def handle_task():
+            try:
+                result = await coro
+                self.queue.put(("success", result))
+            except Exception as e:
+                self.queue.put(("error", str(e)))
+                
+        asyncio.run_coroutine_threadsafe(handle_task(), self.loop)
+    
+    def _process_queue(self):
+        """Process async results from the queue."""
+        try:
+            while True:
+                status, result = self.queue.get_nowait()
+                if status == "success" and isinstance(result, list):
+                    # Update device list with scan results
+                    self.device_list.delete(0, tk.END)
+                    for device in result:
+                        name = device["name"] or "Unknown Device"
+                        addr = device["address"]
+                        self.device_list.insert(tk.END, f"{name} ({addr})")
+                    self.status_label.config(text=f"Found {len(result)} devices")
+                elif status == "error":
+                    self.status_label.config(text=f"Error: {result}")
+                    
+                self.scanning = False
+                self.scan_button.config(state="normal")
+        except queue.Empty:
+            pass
+            
+        # Schedule next queue check
+        if not self.window.winfo_exists():
+            return
+        self.window.after(100, self._process_queue)
+    
     def _start_scan(self):
         """Start BLE device scan."""
         if self.scanning:
@@ -60,56 +123,19 @@ class HydraRemoteGUI:
         self.status_label.config(text="Scanning...")
         self.device_list.delete(0, tk.END)
         
-        # Run scan in background
-        asyncio.create_task(self._scan_devices())
-    
-    async def _scan_devices(self):
-        """Perform BLE scan and update UI with results."""
-        try:
-            timeout = self.config.get("ble", {}).get("scan_timeout", 5.0)
-            self.devices = await scan_for_devices(timeout=timeout)
-            
-            # Update device list
-            for device in self.devices:
-                name = device["name"] or "Unknown Device"
-                addr = device["address"]
-                self.device_list.insert(tk.END, f"{name} ({addr})")
-                
-            self.status_label.config(text=f"Found {len(self.devices)} devices")
-            
-        except Exception as e:
-            self.status_label.config(text=f"Error: {str(e)}")
-            
-        finally:
-            self.scanning = False
-            self.scan_button.config(state="normal")
+        # Queue the scan operation
+        timeout = self.config.get("ble", {}).get("scan_timeout", 5.0)
+        self._queue_async_task(self.ble.scan(timeout=timeout))
     
     def run(self):
         """Start the GUI event loop."""
+        # Start queue processing
+        self._process_queue()
+        # Run the main loop
         self.window.mainloop()
-
-async def run_smoke():
-    """Run a smoke test to verify basic functionality."""
-    print("hydra_universal_remote smoke-run")
-    cfg = load_config()
-    if isinstance(cfg, dict):
-        print(f"loaded config keys: {list(cfg.keys())}")
-    else:
-        print("loaded config (non-dict)")
-        
-    try:
-        import bleak
-        print("bleak available")
-    except ImportError:
-        print("bleak not available")
-        
-    try:
-        import flipperzero
-        print("flipperzero protobuf available")
-    except ImportError:
-        print("flipperzero protobuf not available")
-        
-    print("smoke-run complete — no hardware accessed")
+        # Cleanup
+        if self.loop.is_running():
+            self.loop.call_soon_threadsafe(self.loop.stop)
 
 def main():
     """Application entry point."""

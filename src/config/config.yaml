@@ -1,0 +1,32 @@
+# Default configuration for Hydra Universal Remote
+
+# BLE scan settings
+ble:
+  scan_timeout: 5.0  # seconds
+  auto_connect: false  # automatically connect to known devices
+
+# Known devices (will be auto-populated)
+devices: []
+
+# Device templates for common remote control profiles
+templates:
+  - name: "generic_ble"
+    type: "ble"
+    services: []
+    characteristics: []
+
+  - name: "flipper_zero"
+    type: "flipper"
+    protocol: "protobuf"
+    services:
+      - "00000000-0000-1000-8000-00805f9b34fb"  # Generic Access
+    characteristics:
+      - "00002a00-0000-1000-8000-00805f9b34fb"  # Device Name
+
+# UI settings
+ui:
+  theme: "default"
+  window:
+    width: 800
+    height: 600
+    title: "Hydra Universal Remote"

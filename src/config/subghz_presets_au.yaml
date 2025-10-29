@@ -1,0 +1,74 @@
+# Sub-GHz frequency presets and protocols for Australia
+# Includes all government and private allocations (public, commercial, industrial, automotive, security, IoT, etc.)
+# For reference: ACMA Radiocommunications, LIPD Class Licence, UHF/ISM bands, vehicle remotes, garage doors, alarms, telemetry, smart meters, etc.
+
+  - name: "UHF ISM Band (Primary)"
+    frequency: 433.92
+    modulation: "ASK/FSK"
+    protocol: "Generic / Keeloq / PT2262 / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / CAME / DoorHan / Nice FLO / FAAC SLH / Marantec / Linear / Chamberlain / Sommer / Star Line / Centurion / Princeton / Remote / Custom"
+    notes: "Most garage doors, car remotes, alarms, IoT, telemetry, smart meters, wireless sensors, home automation."
+  - name: "UHF ISM Band (Secondary)"
+    frequency: 434.79
+    modulation: "ASK/FSK"
+    protocol: "Generic / Keeloq / PT2262 / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / CAME / DoorHan / Nice FLO / FAAC SLH / Marantec / Linear / Chamberlain / Sommer / Star Line / Centurion / Princeton / Remote / Custom"
+    notes: "Alternative for crowded environments, telemetry, industrial control."
+  - name: "UHF Paging / Telemetry"
+    frequency: 435.0
+    modulation: "FSK/ASK"
+    protocol: "Paging / Telemetry / Data / Custom"
+    notes: "Paging transmitters, telemetry, data links."
+  - name: "UHF LIPD Class Licence (Wide)"
+    frequency: 430.0-440.0
+    modulation: "ASK/FSK/PSK"
+    protocol: "Generic / Data / Custom"
+    notes: "All LIPD Class Licence devices, including telemetry, alarms, wireless sensors, smart meters, IoT."
+  - name: "Automotive Remote (Holden/Ford/Toyota/etc)"
+    frequency: 303.875
+    modulation: "FSK/ASK"
+    protocol: "Keeloq / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / Custom"
+    notes: "Car remotes, immobilisers, keyless entry."
+  - name: "Automotive Remote (European)"
+    frequency: 315.0
+    modulation: "FSK/ASK"
+    protocol: "Keeloq / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / Custom"
+    notes: "Imported vehicles, some aftermarket remotes."
+  - name: "Security Alarm (Legacy)"
+    frequency: 418.0
+    modulation: "ASK"
+    protocol: "PT2262 / EV1527 / Custom"
+    notes: "Older alarm systems, wireless sensors."
+  - name: "Security Alarm (Modern)"
+    frequency: 433.42
+    modulation: "ASK/FSK"
+    protocol: "Keeloq / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / Custom"
+    notes: "Modern wireless alarms, sensors."
+  - name: "Industrial Telemetry / SCADA"
+    frequency: 437.5
+    modulation: "FSK/ASK/PSK"
+    protocol: "Data / Custom"
+    notes: "SCADA, telemetry, industrial control."
+  - name: "Smart Meter / IoT"
+    frequency: 434.0
+    modulation: "FSK/ASK/PSK"
+    protocol: "Data / Custom"
+    notes: "Smart meters, IoT, wireless sensors."
+  - name: "Wireless Microphone / Audio"
+    frequency: 520.0-526.0
+    modulation: "FM/FSK"
+    protocol: "Audio / Custom"
+    notes: "Wireless microphones, audio links."
+  - name: "Remote Keyless Entry (RKE)"
+    frequency: 433.92
+    modulation: "ASK/FSK"
+    protocol: "Keeloq / HCS200 / HCS301 / HCS360 / HCS410 / HCS512 / EV1527 / Custom"
+    notes: "Car remotes, garage doors, security."
+  - name: "Wireless Sensor Network"
+    frequency: 433.05-434.79
+    modulation: "FSK/ASK/PSK"
+    protocol: "Data / Custom"
+    notes: "IoT, sensor networks, telemetry."
+  - name: "Custom / Experimental"
+    frequency: "Any legal AU frequency"
+    modulation: "Any legal AU modulation"
+    protocol: "Any legal AU protocol"
+    notes: "For research, development, and experimental use."

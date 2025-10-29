@@ -1,0 +1,14 @@
+presets:
+  - name: "Garage Door"
+    frequency: 433.92
+    modulation: "ASK"
+    protocol: "Keeloq"
+  - name: "Car Remote"
+    frequency: 315.0
+    modulation: "FSK"
+    protocol: "HCS200"
+regions:
+  - name: "EU"
+    allowed_frequencies: [433.05, 434.79]
+  - name: "US"
+    allowed_frequencies: [315.0, 390.0]

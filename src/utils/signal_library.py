@@ -37,6 +37,7 @@ class SignalLibrary:
         self.base_path = Path(base_path)
         self.signals: Dict[str, SignalMetadata] = {}
         self._ensure_directories()
+        self._load_metadata()
         
     def _ensure_directories(self):
         """Create necessary directory structure."""

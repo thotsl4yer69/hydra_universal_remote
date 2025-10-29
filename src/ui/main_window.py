@@ -5,13 +5,13 @@ from tkinter import ttk, messagebox
 from ttkthemes import ThemedTk
 from pathlib import Path
 import logging
-import asyncio
-import threading
-from typing import Optional
 
+from ..core.logging_utils import configure_logging
+from ..core.runtime import runtime
 from ..utils.config import load_config
 from ..utils.signal_library import SignalLibrary
-from ..device.flipper_ble import FlipperZeroBLE
+from ..device.device_manager import DeviceManager
+from .device_frame import DeviceConnectionFrame
 from .signal_browser import SignalBrowserFrame
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,11 @@ class HydraRemoteGUI:
         
         # Initialize components
         self.signal_library = SignalLibrary(Path.cwd() / 'signals')
-        self.flipper = FlipperZeroBLE()
+        self.device_manager = DeviceManager()
         self.current_signal = None
+        self._runtime = runtime
         
         self._init_ui()
-        self._setup_async()
         
     def _init_ui(self):
         """Initialize UI components."""
@@ -44,24 +44,12 @@ class HydraRemoteGUI:
         main_container.pack(fill=tk.BOTH, expand=True)
         
         # Device frame (left side)
-        device_frame = ttk.LabelFrame(main_container, text="Device Control")
-        device_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
-        
-        # Device status
-        status_frame = ttk.Frame(device_frame)
-        status_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Label(status_frame, text="Status:").pack(side=tk.LEFT)
-        self.status_label = ttk.Label(status_frame, text="Disconnected")
-        self.status_label.pack(side=tk.LEFT, padx=5)
-        
-        # Connect button
-        self.connect_button = ttk.Button(
-            device_frame,
-            text="Connect",
-            command=self._connect_device
+        self.device_frame = DeviceConnectionFrame(
+            main_container,
+            self.device_manager,
+            self._on_connection_changed
         )
-        self.connect_button.pack(fill=tk.X, padx=5, pady=5)
+        self.device_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
         
         # Signal frame (right side)
         signal_frame = ttk.LabelFrame(main_container, text="Signal Browser")
@@ -87,92 +75,82 @@ class HydraRemoteGUI:
         )
         self.transmit_button.pack(fill=tk.X, padx=5, pady=5)
         
-    def _setup_async(self):
-        """Setup async event loop for background tasks."""
-        self.loop = asyncio.new_event_loop()
-        thread = threading.Thread(target=self._run_async_loop, daemon=True)
-        thread.start()
+    def _on_connection_changed(self, is_connected: bool):
+        """Handle connection state changes.
         
-    def _run_async_loop(self):
-        """Run async event loop in background thread."""
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_forever()
-        
-    def _connect_device(self):
-        """Handle device connection."""
-        async def connect():
-            try:
-                self.connect_button.state(['disabled'])
-                self.status_label.configure(text="Connecting...")
-                
-                # Find and connect to Flipper
-                device = await self.flipper.find_flipper()
-                if not device:
-                    raise RuntimeError("No Flipper Zero found")
-                    
-                if await self.flipper.connect_to_flipper(device.get('address')):
-                    self.status_label.configure(text="Connected")
-                    self.connect_button.configure(text="Disconnect")
-                    self.transmit_button.state(['!disabled'])
-                else:
-                    raise RuntimeError("Connection failed")
-                    
-            except Exception as e:
-                logger.error(f"Connection error: {e}")
-                self.status_label.configure(text="Connection failed")
-                messagebox.showerror(
-                    "Connection Error",
-                    f"Failed to connect: {str(e)}"
-                )
-            finally:
-                self.connect_button.state(['!disabled'])
-                
-        future = asyncio.run_coroutine_threadsafe(connect(), self.loop)
-        future.result()  # Wait for completion
-        
+        Args:
+            is_connected: True if device is connected, False otherwise
+        """
+        # Enable/disable transmit button based on connection state
+        # and whether a signal is selected
+        if is_connected and self.current_signal:
+            self.transmit_button.state(['!disabled'])
+        else:
+            self.transmit_button.state(['disabled'])
+            
     def _on_signal_selected(self, signal):
         """Handle signal selection."""
         self.current_signal = signal
         self.transmit_button.state(
-            ['!disabled'] if signal and self.flipper.is_connected() else ['disabled']
+            ['!disabled'] if signal and self.device_manager.is_connected() else ['disabled']
         )
         
     def _transmit_signal(self):
         """Handle signal transmission."""
-        if not self.current_signal or not self.flipper.is_connected():
+        if not self.current_signal or not self.device_manager.is_connected():
             return
             
+        self.transmit_button.state(['disabled'])
+
         async def transmit():
+            return await self.device_manager.transmit_signal(self.current_signal)
+
+        future = self._runtime.run_in_background(transmit())
+
+        def _on_complete(_future):
             try:
-                self.transmit_button.state(['disabled'])
-                # Implement actual transmission logic here
-                # This will depend on your Flipper Zero protocol implementation
-                await asyncio.sleep(1)  # Placeholder
-                messagebox.showinfo(
-                    "Transmission Complete",
-                    "Signal transmitted successfully"
-                )
-            except Exception as e:
-                logger.error(f"Transmission error: {e}")
-                messagebox.showerror(
-                    "Transmission Error",
-                    f"Failed to transmit signal: {str(e)}"
-                )
+                success = _future.result()
+            except Exception as exc:
+                logger.error("Transmission error: %s", exc)
+                messagebox.showerror("Transmission Error", f"Failed to transmit signal: {exc}")
+            else:
+                if success:
+                    messagebox.showinfo("Success", "Signal transmitted successfully")
+                else:
+                    messagebox.showerror("Transmission Error", "Failed to transmit signal")
             finally:
-                self.transmit_button.state(['!disabled'])
-                
-        future = asyncio.run_coroutine_threadsafe(transmit(), self.loop)
-        future.result()  # Wait for completion
+                if self.device_manager.is_connected():
+                    self.transmit_button.state(['!disabled'])
+
+        future.add_done_callback(lambda fut: self.window.after(0, _on_complete, fut))
         
     def run(self):
         """Start the GUI."""
         self.window.mainloop()
         
+    def cleanup(self):
+        """Clean up resources."""
+        if self.device_manager.is_connected():
+            future = self._runtime.run_in_background(self.device_manager.disconnect())
+
+            def _wait(_future):
+                try:
+                    _future.result()
+                except Exception as exc:
+                    logger.warning("Device disconnect failed: %s", exc)
+
+            future.add_done_callback(lambda fut: self.window.after(0, _wait, fut))
+
+        self._runtime.shutdown()
+        
 def main():
     """Main entry point."""
-    logging.basicConfig(level=logging.INFO)
+    configure_logging()
     gui = HydraRemoteGUI()
-    gui.run()
+    try:
+        gui.run()
+    finally:
+        gui.cleanup()
 
 if __name__ == "__main__":
     main()

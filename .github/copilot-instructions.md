@@ -7,52 +7,40 @@ Keep it short, actionable, and specific to this codebase.
 Goal: help an AI coding agent be immediately productive in this repository.
 
 ## Quick context
-- Language: Python. Dependencies live in `requirements.txt` (notable packages: `bleak`, `flipperzero-protobuf-py`, `pyyaml`, `ttkthemes`).
-- Layout: `src/` with `config/` and `utils/` folders (currently empty). There is no top-level `README.md` or obvious entrypoint in the repository root.
+- Python 3.10+ project. Runtime deps live in `requirements.txt`; GUI-only extras in `requirements-gui.txt`; dev tooling in `requirements-dev.txt`.
+- Two GUIs coexist: legacy monolith `src/main.py` (still covered by tests) and the newer modular UI under `src/ui/`.
+- Config, transports, and signal tooling reside in `src/config/`, `src/device/`, `src/utils/`, and `src/core/`.
 
-## Big-picture architecture (what to know)
-- This project integrates with external devices/protocols: `bleak` implies BLE device interaction; `flipperzero-protobuf-py` indicates usage of Flipper Zero protobuf message types. Treat BLE and protobuf usage as the main external integration surface.
-- Code is organized under `src/`. Expect configuration files under `src/config/` (likely YAML based, since `pyyaml` is a dependency) and shared helpers under `src/utils/`.
-- Data flow to look for: device -> BLE transport (`bleak`) -> protobuf serialization/deserialization -> application logic -> optional UI (ttk themes suggests a Tkinter-based UI). Search for async/await patterns when adding features (BLE + networking/IO is asynchronous).
+## Architecture highlights
+- `src/core/runtime.py` hosts `AsyncRuntime`, the background asyncio loop shared by GUI widgets; schedule work with `runtime.run_in_background`.
+- `src/core/logging_utils.py` centralises logging setup; call `configure_logging()` before spinning up windows.
+- `src/device/device_manager.py` orchestrates `FlipperUSBTransport`, `FlipperBLETransport`, and `MockTransport`, exposing async `scan/connect/test` helpers.
+- Tk UI is split into frames (`src/ui/device_frame.py`, `src/ui/signal_browser.py`) composed by `src/ui/main_window.py`.
+- Signal assets live in `signals/`; `src/utils/signal_library.py` loads metadata and Sub-GHz payloads from that tree.
+- Legacy routines (BLE adapters, notebooks, etc.) remain under `src/main.py` and related device modules—keep backward compatibility unless the migration plan says otherwise.
 
-## Where to start (key files & searches)
-- Read `requirements.txt` to understand runtime dependencies and required native/environmental capabilities.
-- Inspect `src/` for modules. If you add features, place reusable helpers in `src/utils/` and configuration schemas in `src/config/`.
-- If you need to find protobuf message usage: search for `flipperzero` or `.proto` references.
-- For BLE-specific work: search for `bleak` imports and `async` functions that call device read/write APIs.
+## Daily workflows
+- Install deps: `python -m pip install -r requirements.txt`; add `requirements-dev.txt` when linting/tests are needed.
+- Launch new GUI: `python -m src.ui.main_window`; legacy smoke run: `python -m src.main`.
+- Tests use `unittest`: `python -m unittest discover -v`. Hardware integration is opt-in with `RUN_HARDWARE_INTEGRATION=true python -m unittest tests.test_integration_hardware`.
+- `Makefile` mirrors these commands for POSIX shells; on Windows call the `python -m ...` invocations directly.
 
-## Development workflows (how to run & debug)
-- Create and activate a virtual environment (use system Python). Then install deps:
-  - pip install -r requirements.txt
-- There is no documented entrypoint. Before adding a `main` script, search for any existing runnable module under `src/`. If none exists, create `src/main.py` with an async entry function and a small CLI wrapper.
-- Debugging tips:
-  - Use an interactive session (REPL) or a small runner script to exercise BLE/protobuf code — these integrations are hardware-dependent.
-  - When testing BLE code locally, consider mocking `bleak` calls using `unittest.mock` or an adapter interface.
+## Conventions & patterns
+- GUI callbacks must stay synchronous; delegate async device work through `self._runtime.run_in_background(...)` and handle completion via Tk `after` callbacks.
+- Always surface transport availability via `DeviceManager.scan_devices()`; use `MockTransport` when hardware libs (`pyserial`, `bleak`) are missing.
+- Central config comes from `src/config/config.yaml` through `utils.config.load_config`; avoid hard-coding UI defaults.
+- `SignalLibrary` auto-creates category folders and persists metadata—reuse it for any signal CRUD to keep `metadata.json` in sync.
+- Optional dependencies should stay gracefully guarded (see `device/flipper_transport.py`), logging clear reasons when unavailable.
 
-## Project-specific conventions & patterns
-- Configs are likely YAML (dependency `pyyaml`) — treat `src/config/` as the place for YAML schema and loader utilities.
-- Use `async`/`await` for IO operations (BLE, network, device I/O). Prefer creating small async functions that are easy to unit test with `pytest` and `asyncio` test support.
-- Keep device/protocol code (BLE + protobuf) separated from UI and business logic. If none exists yet, create `src/device/`, `src/proto/`, `src/ui/` as needed to keep boundaries clear.
+## Testing & quality
+- Existing tests patch `src.main.HydraRemoteGUI`; extend them or add new suites under `tests/` using the same `unittest` style.
+- Skip or guard hardware-dependent tests unless `RUN_HARDWARE_INTEGRATION` is explicitly enabled.
+- When adding transports or async helpers, mirror the logging and exception patterns already used in `device_manager` and transports.
 
-## Integration points & external dependencies to watch
-- BLE: `bleak` — requires platform BLE support and sometimes elevated permissions. Mock during unit tests.
-- Flipper Zero protobuf: `flipperzero-protobuf-py` — ensure protobuf message compatibility with any .proto or generated modules.
-- YAML configs: `pyyaml` — centralize config loading and validate schema early.
-
-## Examples from this repo
-- `requirements.txt` (source of truth for runtime deps):
-  - bleak>=0.21.1
-  - flipperzero-protobuf-py>=0.17.2
-  - pyyaml>=6.0.1
-
-## Small checklist for changes an AI might make
-1. Add a small README describing how to run the project (include `pip install -r requirements.txt`).
-2. If adding runnable behavior, add `src/main.py` and update docs.
-3. Add tests for async device interactions using mocks (place tests under `tests/`).
-
-## When to ask the human
-- If you need to run or interact with hardware (BLE/Flipper) — ask for access to test devices, sample protobuf schemas, or example config files.
-- If you plan to add or change public APIs or configuration formats, request a brief design confirmation.
+## Coordinate with the human when…
+- Altering the config schema, existing signal formats, or the legacy `src/main.py` execution path.
+- Planning changes that require real Flipper Zero hardware, BLE addresses, or proprietary signal files.
+- Introducing new external dependencies or platform-specific setup steps beyond those documented in the README.
 
 ---
-If anything above is unclear or you want the file to emphasize other conventions (commit messages, branching, CI), tell me what to include and I will iterate.
+If anything above needs clarification or misses a workflow, let me know and I’ll iterate.

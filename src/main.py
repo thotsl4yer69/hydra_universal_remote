@@ -136,7 +136,7 @@ class HydraRemoteGUI:
         freq_frame = ttk.LabelFrame(frame, text="Frequency", padding="5")
         freq_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
         
-        self.freq_var = tk.StringVar(value="433.92")
+        self.freq_var = tk.StringVar(master=self.window, value="433.92")
         freq_entry = ttk.Entry(freq_frame, textvariable=self.freq_var, width=10)
         freq_entry.grid(row=0, column=0, padx=5)
         ttk.Label(freq_frame, text="MHz").grid(row=0, column=1)
@@ -145,7 +145,7 @@ class HydraRemoteGUI:
         mod_frame = ttk.LabelFrame(frame, text="Modulation", padding="5")
         mod_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
         
-        self.mod_var = tk.StringVar(value="AM")
+        self.mod_var = tk.StringVar(master=self.window, value="AM")
         ttk.Radiobutton(mod_frame, text="AM", variable=self.mod_var, value="AM").grid(row=0, column=0, padx=5)
         ttk.Radiobutton(mod_frame, text="FM", variable=self.mod_var, value="FM").grid(row=0, column=1, padx=5)
         

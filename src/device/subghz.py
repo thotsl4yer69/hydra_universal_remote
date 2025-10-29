@@ -5,7 +5,7 @@ Based on official protocol specifications and community research.
 
 import numpy as np
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from enum import Enum
 import logging
 import struct

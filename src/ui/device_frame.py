@@ -62,13 +62,6 @@ class DeviceConnectionFrame(ttk.LabelFrame):
             variable=self.connection_type
         ).pack(side=tk.LEFT, padx=5)
 
-        ttk.Radiobutton(
-            type_frame,
-            text="Mock",
-            value="mock",
-            variable=self.connection_type
-        ).pack(side=tk.LEFT, padx=5)
-        
         # Status display
         status_frame = ttk.Frame(self)
         status_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -142,20 +135,18 @@ class DeviceConnectionFrame(ttk.LabelFrame):
             self.info_text.configure(state=tk.NORMAL)
             self.info_text.delete(1.0, tk.END)
             
-            if devices["usb"]:
+            if devices.get("usb"):
                 self.info_text.insert(tk.END, f"USB: {devices['usb']['port']}\n")
-            if devices["ble"]:
+            if devices.get("ble"):
                 self.info_text.insert(tk.END, f"BLE: {devices['ble']['address']}\n")
-            if devices.get("mock"):
-                self.info_text.insert(tk.END, "Mock transport available\n")
-                
-            if not (devices["usb"] or devices["ble"]):
+            
+            if not (devices.get("usb") or devices.get("ble")):
                 self.info_text.insert(tk.END, "No devices found")
                 
             self.info_text.configure(state=tk.DISABLED)
             
             # Enable connect button if devices found
-            if devices["usb"] or devices["ble"] or devices.get("mock"):
+            if devices.get("usb") or devices.get("ble"):
                 self.connect_button.configure(state=tk.NORMAL)
                 
         except Exception as e:
@@ -183,21 +174,21 @@ class DeviceConnectionFrame(ttk.LabelFrame):
             devices = await self.device_manager.scan_devices()
             
             if conn_type == "auto":
-                if devices["usb"]:
+                if devices.get("usb"):
                     success = await self.device_manager.connect(
                         ConnectionType.USB,
                         port=devices["usb"]["port"]
                     )
-                elif devices["ble"]:
+                elif devices.get("ble"):
                     success = await self.device_manager.connect(
                         ConnectionType.BLE,
                         address=devices["ble"]["address"]
                     )
                 else:
-                    success = await self.device_manager.connect(ConnectionType.MOCK)
+                    raise RuntimeError("No devices found. Please connect your Flipper Zero.")
 
             elif conn_type == "usb":
-                if not devices["usb"]:
+                if not devices.get("usb"):
                     raise RuntimeError("No USB device found")
                 success = await self.device_manager.connect(
                     ConnectionType.USB,
@@ -205,15 +196,12 @@ class DeviceConnectionFrame(ttk.LabelFrame):
                 )
                 
             elif conn_type == "ble":
-                if not devices["ble"]:
+                if not devices.get("ble"):
                     raise RuntimeError("No BLE device found")
                 success = await self.device_manager.connect(
                     ConnectionType.BLE,
                     address=devices["ble"]["address"]
                 )
-
-            else:  # Mock
-                success = await self.device_manager.connect(ConnectionType.MOCK)
                 
             if success:
                 self.connect_button.configure(text="Disconnect")

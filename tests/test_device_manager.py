@@ -20,7 +20,7 @@ class DummySignalNoPayload:
 class TestDeviceManagerTransmit(unittest.TestCase):
     def test_transmit_signal_with_mock_transport(self):
         async def runner():
-            manager = DeviceManager()
+            manager = DeviceManager(enable_mock=True)
             self.assertTrue(await manager.connect(ConnectionType.MOCK))
             signal = DummySignal(b"payload")
             result = await manager.transmit_signal(signal)
@@ -31,7 +31,7 @@ class TestDeviceManagerTransmit(unittest.TestCase):
 
     def test_transmit_signal_without_payload(self):
         async def runner():
-            manager = DeviceManager()
+            manager = DeviceManager(enable_mock=True)
             self.assertTrue(await manager.connect(ConnectionType.MOCK))
             signal = DummySignalNoPayload()
             result = await manager.transmit_signal(signal)

@@ -1,4 +1,4 @@
-"""Device manager orchestrating transports and mock support."""
+"""Device manager orchestrating transports and device connectivity."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from .flipper_transport import (
     FlipperUSBTransport,
     TransportStatus,
 )
-from .mock_transport import MockTransport
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +32,17 @@ class ConnectionStatus(str, Enum):
 class DeviceManager:
     """High-level device orchestration with optional transports."""
 
-    def __init__(self) -> None:
-        self._transports: Dict[ConnectionType, FlipperTransport] = {
+    def __init__(self, *, enable_mock: bool = False) -> None:
+        transports: Dict[ConnectionType, FlipperTransport] = {
             ConnectionType.USB: FlipperUSBTransport(),
             ConnectionType.BLE: FlipperBLETransport(),
-            ConnectionType.MOCK: MockTransport(),
         }
+
+        if enable_mock:
+            from .mock_transport import MockTransport
+            transports[ConnectionType.MOCK] = MockTransport()
+
+        self._transports = transports
         self._status_callbacks: list[Any] = []
         self.status = ConnectionStatus.DISCONNECTED
         self.connection_type: Optional[ConnectionType] = None
@@ -66,24 +70,26 @@ class DeviceManager:
                 logger.error("Status callback failure: %s", exc)
 
     async def scan_devices(self) -> Dict[str, Any]:
-        devices: Dict[str, Any] = {"usb": None, "ble": None, "mock": {"address": "mock://flipper"}}
+        devices: Dict[str, Any] = {"usb": None, "ble": None}
 
-        usb_transport = self._transports[ConnectionType.USB]
-        usb_status = usb_transport.availability()
-        if usb_status.available:
-            detected = FlipperUSBTransport.find_flipper_port()
-            if detected:
-                devices["usb"] = {"port": detected[0], "vid_pid": detected[1]}
+        usb_transport = self._transports.get(ConnectionType.USB)
+        if usb_transport:
+            usb_status = usb_transport.availability()
+            if usb_status.available:
+                detected = FlipperUSBTransport.find_flipper_port()
+                if detected:
+                    devices["usb"] = {"port": detected[0], "vid_pid": detected[1]}
 
-        ble_transport = self._transports[ConnectionType.BLE]
-        ble_status = ble_transport.availability()
-        if ble_status.available:
-            try:
-                address = await FlipperBLETransport.find_flipper_device()
-                if address:
-                    devices["ble"] = {"address": address}
-            except Exception as exc:
-                logger.error("BLE scan error: %s", exc)
+        ble_transport = self._transports.get(ConnectionType.BLE)
+        if ble_transport:
+            ble_status = ble_transport.availability()
+            if ble_status.available:
+                try:
+                    address = await FlipperBLETransport.find_flipper_device()
+                    if address:
+                        devices["ble"] = {"address": address}
+                except Exception as exc:
+                    logger.error("BLE scan error: %s", exc)
 
         return devices
 

@@ -12,10 +12,8 @@ async def scan_devices():
     print(f"Python version: {sys.version}")
     
     try:
-        devices = await BleakScanner.discover(
-            timeout=10.0,
-            return_adv=True
-        )
+        scanner = BleakScanner()
+        devices = await scanner.discover(timeout=10.0)
         
         if not devices:
             print("No devices found! Please check if:")
@@ -25,27 +23,19 @@ async def scan_devices():
             return
             
         print(f"\nFound {len(devices)} devices:")
-        for device, adv_data in devices.items():
+        for device in devices:
             print("\nDevice Details:")
             print(f"Address: {device.address}")
             print(f"Name: {device.name or 'Unknown'}")
-            print(f"RSSI: {adv_data.rssi} dBm")
-            
-            if adv_data.manufacturer_data:
-                print("Manufacturer Data:")
-                for key, value in adv_data.manufacturer_data.items():
-                    print(f"  ID: {key}, Data: {value.hex()}")
-            
-            if adv_data.service_data:
-                print("Service Data:")
-                for uuid, data in adv_data.service_data.items():
-                    print(f"  UUID: {uuid}")
-                    print(f"  Data: {data.hex()}")
-            
-            if adv_data.service_uuids:
-                print("Service UUIDs:")
-                for uuid in adv_data.service_uuids:
-                    print(f"  {uuid}")
+            print(f"Details: {device!r}")
+            for attr in dir(device):
+                if not attr.startswith('_'):
+                    try:
+                        value = getattr(device, attr)
+                        if not callable(value):
+                            print(f"{attr}: {value}")
+                    except Exception:
+                        continue
                     
     except Exception as e:
         print(f"\nError during scan: {str(e)}")

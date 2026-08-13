@@ -1,43 +1,64 @@
-# hydra_universal_remote
+# Hydra Universal Remote
 
-![CI](https://github.com/thotsl4yer69/maz-ai-orchestrator/actions/workflows/ci-clean.yml/badge.svg)
+**BLE/protobuf device-integration experiment with a testable Python core.**
 
-Minimal runner and instructions for local development.
+[![Status](https://img.shields.io/badge/status-software%20prototype-blue)](PROJECT_STATUS.md)
 
-Prereqs
+> **Maturity: Software prototype.** “Universal remote” is the product direction, not a claim that the repository can control every device. Compatibility should be stated only for hardware/protocol combinations actually tested.
 
-- Python 3.8+ (recommended 3.10/3.11 for hardware packages). Create and activate a virtualenv.
+## What it explores
 
-Install dependencies
+Hydra is a small Python project for experimenting with control layers around BLE-connected hardware and protobuf-based device interfaces.
 
-```powershell
+The repository is intentionally structured so hardware-specific behaviour can sit behind a testable application boundary rather than making every unit test require a physical device.
+
+## Relevant technology
+
+- Python;
+- `bleak` for Bluetooth Low Energy integration;
+- Flipper/protobuf-related integration libraries where used by the selected revision;
+- device adapters under the project source tree;
+- mocks/fakes for hardware-independent tests;
+- GitHub Actions / Python test automation.
+
+## Setup
+
+Create a virtual environment, then install the runtime and development dependencies:
+
+```bash
 python -m pip install -r requirements.txt
-```
-
-Install developer/test dependencies
-
-```powershell
 python -m pip install -r requirements-dev.txt
 ```
 
-Run a smoke-run
+Smoke-run the software-only path:
 
-```powershell
+```bash
 python -m src.main
 ```
 
-Run tests
+Run tests:
 
-```powershell
+```bash
 python -m unittest discover -v
 ```
 
-Notes
+## Hardware boundary
 
-- This project integrates with BLE devices (via `bleak`) and Flipper Zero protobufs
-  (`flipperzero-protobuf-py`). Hardware-specific code is intentionally absent from
-  the smoke-run and tests — add hardware logic under `src/device/` and mock it in tests.
+The smoke run and ordinary unit tests are deliberately hardware-independent. Add or modify real device logic under the relevant device/adaptor layer and mock external hardware in unit tests.
 
-CI
+A passing software test does not prove BLE connectivity to a physical target. Hardware integration should record:
 
-- The repository includes a GitHub Actions workflow that runs unit tests on Python 3.10 and 3.11, and an optional manual integration job that runs on 3.11 to exercise hardware-adjacent steps.
+- exact device/model/firmware;
+- BLE services/characteristics used;
+- protocol/protobuf version;
+- discovery/pairing requirements;
+- tested commands;
+- failure/reconnection behaviour.
+
+## Provenance
+
+Third-party protobuf definitions, libraries and device protocols remain attributable to their upstream authors/vendors. The portfolio claim is the local integration/adaptor work, not authorship of those protocols.
+
+## Portfolio significance
+
+**Python · BLE · protobuf · hardware abstraction · testing · device integration**
